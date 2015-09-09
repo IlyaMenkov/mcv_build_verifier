@@ -33,7 +33,7 @@ function vm_reset () {
 
 python main.py
 # Setup ssh on controller
-#controller_setup
+controller_setup
 
 # Create image in glance
 glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file mcv.qcow2 --progress
@@ -46,7 +46,6 @@ nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
 # Get new float ip and add security groups
 controller_ip_address=`ifconfig | grep 172 | awk -F":" {'print $2'} | cut -d' ' -f1 | head -n 1`
 endpoint_ip_address=`keystone endpoint-list | grep 9292 | awk -F"|" {'print $4'} |  awk '{ gsub (" ", "", $0); print}' | awk -F":" {'print $2'} | cut -c 3-`
-endpoint_ip_address='172.16.0.3'
 float_ip_address=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
 nova floating-ip-associate mcv_vm $float_ip_address
 nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0
