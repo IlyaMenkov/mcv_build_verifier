@@ -3,7 +3,6 @@
 
 # This module was uploaded from
 # https://github.com/ivanovmi/google-cli-tools/
-__author__ = 'imenkov'
 
 import mimetypes
 import googleapiclient
@@ -75,7 +74,7 @@ def download_file(service, file_id, filename):
 
 
 def main(file_name):
-    file_id = raw_input("Please enter file id: ")
+    file_id = raw_input("Please enter image id: ")
     credentials = authentication()
     http = httplib2.Http()
     credentials.authorize(http)

@@ -1,6 +1,7 @@
 #!/bin/bash
 #set-x
 
+#######################################################################################################################
 function controller_setup () {
     sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config
     service ssh restart
@@ -8,9 +9,9 @@ function controller_setup () {
 
 function vm_setup () {
     #Set ip credentials for tests
-    sudo sed -i '/\[basic\]/a nailgun_host=172.16.0.131' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a nailgun_host=172.16.0.4' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a nailgun_host=172.16.0.3' /etc/mcv/mcv.conf
+    sudo sed -i '/\[basic\]/a instance_ip=172.16.0.131' /etc/mcv/mcv.conf
+    sudo sed -i '/\[basic\]/a controller_ip=172.16.0.4' /etc/mcv/mcv.conf
+    sudo sed -i '/\[basic\]/a auth_endpoint_ip=172.16.0.3' /etc/mcv/mcv.conf
     sudo sed -i '/\[basic\]/a nailgun_host=172.16.0.1' /etc/mcv/mcv.conf
     sudo sed -i '/\[basic\]/a os_username=admin' /etc/mcv/mcv.conf
     sudo sed -i '/\[basic\]/a os_tenant_name=admin' /etc/mcv/mcv.conf
@@ -18,18 +19,63 @@ function vm_setup () {
     sudo sed -i '/\[basic\]/a cluster_id==1' /etc/mcv/mcv.conf
 }
 
-function vm_test () {
+#######################################################################################################################
+# Save logs from instance on my PC
+function save_logs () {
+    sudo scp -r /var/log/ imenkov@172.18.66.5:/tmp/test_logs
+    c=$?
+    if [ c!=0 ]
+        then
+            echo "LOG OK"
+    fi
+}
+
+#######################################################################################################################
+# Functions for tests rinning
+function vm_test_full () {
+    sudo mcvconsoler --run custom full_mos
+    sudo mcvconsoler --run custom full_load
+    c=$?
+    if [ c!=0 ]
+        then
+            echo "full failed"
+    fi
+
+}
+
+function vm_test_rally () {
     # Running tests
     sudo mcvconsoler --run custom default
     sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml
-    sudo mcvconsoler --run custom full_mos
-    sudo mcvconsoler --run custom shaker
-    sudo scp -r /var/log/ imenkov@172.18.66.5:/tmp/log
-    #sudo mcvconsoler --run custom full_load
+    c=$?
+    if [ c!=0 ]
+        then
+            echo "rally default or single failed"
+    fi
     #for i in `ls /opt/mcv-consoler/test_scenarios/rally/tests/ | grep load`; do sudo mcvconsoler --run single rally $i; done
 }
 
-#download imege from google drive
+function vm_test_ostf () {
+    sudo mcvconsoler --run custom ostf
+    c=$?
+    if [ c!=0 ]
+        then
+            echo "ostf failed"
+    fi
+}
+
+# Running shaker test
+function vm_test_shaker () {
+    sudo mcvconsoler --run custom shaker
+    c=$?
+    if [ c!=0 ]
+        then
+            echo "shaker failed"
+    fi
+}
+
+#######################################################################################################################
+#download image from google drive
 python mcv_build_verifier/main.py
 
 # Setup ssh on controller
@@ -55,12 +101,13 @@ float_ip_address=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'
 nova floating-ip-associate mcv_vm $float_ip_address
 nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0
 nova secgroup-add-rule default tcp 22 22 0.0.0.0/0
-
+#######################################################################################################################
 # Trying connect to VM using ssh and run tests
 code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
     #ssh -t mcv@172.16.0.131 "$(typeset -f); echo mcv | vm_setup $controller_ip_address $float_ip_address $endpoint_ip_address; vm_test"
-    ssh -t mcv@172.16.0.131 "$(typeset -f); echo mcv | vm_setup; vm_test"
+    ssh -t mcv@$float_ip_address "$(typeset -f); echo mcv | vm_setup; vm_test_rally; vm_test_ostf; vm_test_shaker; save_logs;" &>>/tmp/mylogfile
     code=$?
 done
+scp -r /tmp/mylogfile imenkov@172.18.66.5:/tmp/test_logs/
