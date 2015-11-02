@@ -1,6 +1,7 @@
 #!/bin/bash
 #set-x
 
+
 #######################################################################################################################
 function controller_setup () {
     sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config
@@ -8,15 +9,10 @@ function controller_setup () {
 }
 
 function vm_setup () {
-    #Set ip credentials for tests
-    sudo sed -i '/\[basic\]/a instance_ip=172.16.0.131' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a controller_ip=172.16.0.4' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a auth_endpoint_ip=172.16.0.3' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a nailgun_host=172.16.0.1' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a os_username=admin' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a os_tenant_name=admin' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a os_password=admin' /etc/mcv/mcv.conf
-    sudo sed -i '/\[basic\]/a cluster_id==1' /etc/mcv/mcv.conf
+    while read -r name
+    do
+    sudo sed -i '/\[basic\]/a'$name /etc/mcv/mcv.conf
+    done < mcvbc.conf
 }
 
 #######################################################################################################################
@@ -38,7 +34,7 @@ function vm_test_full () {
     c=$?
     if [ c!=0 ]
         then
-            echo "full failed"
+            echo "full test failed"
     fi
 
 }
@@ -107,7 +103,7 @@ code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
     #ssh -t mcv@172.16.0.131 "$(typeset -f); echo mcv | vm_setup $controller_ip_address $float_ip_address $endpoint_ip_address; vm_test"
-    ssh -t mcv@$float_ip_address "$(typeset -f); echo mcv | vm_setup; vm_test_rally; vm_test_ostf; vm_test_shaker; save_logs;" &>>/tmp/mylogfile
+    ssh -t mcv@$float_ip_address "$(typeset -f); vm_setup; vm_test_rally; vm_test_ostf; vm_test_shaker; save_logs; | "  &>>/tmp/mylogfile
     code=$?
 done
-scp -r /tmp/mylogfile imenkov@172.18.66.5:/tmp/test_logs/
+scp -r /tmp/mylogfile imenkov@172.18.78.96:/tmp/test_logs/
