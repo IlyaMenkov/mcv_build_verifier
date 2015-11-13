@@ -11,14 +11,14 @@ function controller_setup () {
 function vm_setup () {
     while read -r name
     do
-    sudo sed -i '/\[basic\]/a'$name /etc/mcv/mcv.conf
-    done < mcvbc.conf
+    echo -mcv | sudo -S sed -i '/\[basic\]/a'$name /etc/mcv/mcv.conf
+    done < mcvbv.conf
 }
 
 #######################################################################################################################
 # Save logs from instance on my PC
 function save_logs () {
-    sudo scp -r /var/log/ imenkov@172.18.66.5:/tmp/test_logs
+    echo -mcv | sudo scp -r /var/log/ imenkov@172.18.66.5:/tmp/test_logs
     c=$?
     if [ c!=0 ]
         then
@@ -29,8 +29,8 @@ function save_logs () {
 #######################################################################################################################
 # Functions for tests rinning
 function vm_test_full () {
-    sudo mcvconsoler --run custom full_mos
-    sudo mcvconsoler --run custom full_load
+    echo mcv | sudo -S mcvconsoler --run custom full_mos
+    echo mcv | sudo -S mcvconsoler --run custom full_load
     c=$?
     if [ c!=0 ]
         then
@@ -41,8 +41,8 @@ function vm_test_full () {
 
 function vm_test_rally () {
     # Running tests
-    sudo mcvconsoler --run custom default
-    sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml
+    echo mcv | sudo -S mcvconsoler --run custom default
+    echo mcv | sudo -S mcvconsoler --run single rally neutron-create_and_list_routers.yaml
     c=$?
     if [ c!=0 ]
         then
@@ -52,7 +52,7 @@ function vm_test_rally () {
 }
 
 function vm_test_ostf () {
-    sudo mcvconsoler --run custom ostf
+    echo mcv | sudo -S mcvconsoler --run custom ostf
     c=$?
     if [ c!=0 ]
         then
@@ -62,7 +62,7 @@ function vm_test_ostf () {
 
 # Running shaker test
 function vm_test_shaker () {
-    sudo mcvconsoler --run custom shaker
+    echo mcv | sudo -S mcvconsoler --run custom shaker
     c=$?
     if [ c!=0 ]
         then
@@ -72,7 +72,8 @@ function vm_test_shaker () {
 
 #######################################################################################################################
 #download image from google drive
-python mcv_build_verifier/main.py
+#python mcv_build_verifier/main.py
+
 
 # Setup ssh on controller
 controller_setup
@@ -86,11 +87,11 @@ network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ g
 # Boot VM
 nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
 
-# Get controller ip address
-controller_ip_address=`ifconfig | grep 172 | awk -F":" {'print $2'} | cut -d' ' -f1 | head -n 1`
+# Get controller ip address from config
+#controller_ip_address=`ifconfig | grep 172 | awk -F":" {'print $2'} | cut -d' ' -f1 | head -n 1`
 
-# Get endpoint ip address
-endpoint_ip_address=`keystone endpoint-list | grep 9292 | awk -F"|" {'print $4'} |  awk '{ gsub (" ", "", $0); print}' | awk -F":" {'print $2'} | cut -c 3-`
+# Get endpoint ip address from config
+#endpoint_ip_address=`keystone endpoint-list | grep 9292 | awk -F"|" {'print $4'} |  awk '{ gsub (" ", "", $0); print}' | awk -F":" {'print $2'} | cut -c 3-`
 
 # Get new float ip and add security groups
 float_ip_address=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
@@ -103,7 +104,7 @@ code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
     #ssh -t mcv@172.16.0.131 "$(typeset -f); echo mcv | vm_setup $controller_ip_address $float_ip_address $endpoint_ip_address; vm_test"
-    ssh -t mcv@$float_ip_address "$(typeset -f); vm_setup; vm_test_rally; vm_test_ostf; vm_test_shaker; save_logs; | "  &>>/tmp/mylogfile
+    ssh -t mcv@$float_ip_address "$(typeset -f); vm_setup; vm_test_rally; save_logs; | "  &>>/tmp/mylogfile
     code=$?
 done
 scp -r /tmp/mylogfile imenkov@172.18.78.96:/tmp/test_logs/
