@@ -75,6 +75,8 @@ function vm_test_shaker () {
 #python mcv_build_verifier/main.py
 
 
+
+
 # Setup ssh on controller
 controller_setup
 
