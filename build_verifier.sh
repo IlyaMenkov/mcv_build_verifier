@@ -1,20 +1,19 @@
 #!/bin/bash
 #set-x
 
-
 #######################################################################################################################
 function controller_setup () {
     sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config
-    service ssh restart
+    service ssh restart &>/tmp/filename
 }
 
 function vm_setup () {
     while read -r name
     do
+    export $name
     echo -mcv | sudo -S sed -i '/\[basic\]/a'$name /etc/mcv/mcv.conf
     done < mcvbv.conf
 }
-
 #######################################################################################################################
 # Save logs from instance on my PC
 function save_logs () {
@@ -27,7 +26,7 @@ function save_logs () {
 }
 
 #######################################################################################################################
-# Functions for tests rinning
+# Functions for tests running
 function vm_test_full () {
     echo mcv | sudo -S mcvconsoler --run custom full_mos
     echo mcv | sudo -S mcvconsoler --run custom full_load
@@ -73,15 +72,19 @@ function vm_test_shaker () {
 #######################################################################################################################
 #download image from google drive
 #python mcv_build_verifier/main.py
-
-
-
-
+function download_mcv_image () {
+    MY_IP='http://172.18.196.12:8000/'
+    ISO_IMAGE=$(curl ${MY_IP} | grep qcow2 | tail -1 | awk '{print $2}' | cut -c 7- | awk -F"\"" {'print $1'})
+    wget ${MY_IP}/${ISO_IMAGE}
+}
 # Setup ssh on controller
 controller_setup
 
+# Download mcv image
+download_mcv_image
+
 # Create image in glance
-glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file mcv.qcow2 --progress
+glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $ISO_IMAGE --progress
 
 # Get network id from neutron
 network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ gsub (" ", "", $0); print}'`
@@ -89,14 +92,8 @@ network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ g
 # Boot VM
 nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
 
-# Get controller ip address from config
-#controller_ip_address=`ifconfig | grep 172 | awk -F":" {'print $2'} | cut -d' ' -f1 | head -n 1`
-
-# Get endpoint ip address from config
-#endpoint_ip_address=`keystone endpoint-list | grep 9292 | awk -F"|" {'print $4'} |  awk '{ gsub (" ", "", $0); print}' | awk -F":" {'print $2'} | cut -c 3-`
-
 # Get new float ip and add security groups
-float_ip_address=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
+instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
 nova floating-ip-associate mcv_vm $float_ip_address
 nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0
 nova secgroup-add-rule default tcp 22 22 0.0.0.0/0
@@ -105,8 +102,7 @@ nova secgroup-add-rule default tcp 22 22 0.0.0.0/0
 code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
-    #ssh -t mcv@172.16.0.131 "$(typeset -f); echo mcv | vm_setup $controller_ip_address $float_ip_address $endpoint_ip_address; vm_test"
-    ssh -t mcv@$float_ip_address "$(typeset -f); vm_setup; vm_test_rally; save_logs; | "  &>>/tmp/mylogfile
+    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup; vm_test_rally; save_logs;"
     code=$?
 done
 scp -r /tmp/mylogfile imenkov@172.18.78.96:/tmp/test_logs/
