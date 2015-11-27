@@ -1,5 +1,5 @@
 #!/bin/bash
-#set-x
+set-x
 
 #######################################################################################################################
 
@@ -34,8 +34,8 @@ function controller_setup () {
     nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
     if [ c!=0 ];then  exit 1; fi
     # Get new float ip and add security groups
-    instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
-    nova floating-ip-associate mcv_vm $float_ip_address
+   # instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
+    nova floating-ip-associate mcv_vm $instance_ip
     nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0
     nova secgroup-add-rule default tcp 22 22 0.0.0.0/0
 }
@@ -44,21 +44,21 @@ function vm_setup () {
     while read -r name
     do
     export $name
-    echo -mcv | sudo -S sed -i '/\[basic\]/a'$name /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$name /etc/mcv/mcv.conf
     done < mcvbv.conf
 }
 
 #######################################################################################################################
 # Save logs from instance on my PC
 function save_logs () {
-    echo -mcv | sudo scp -r /var/log/ imenkov@172.18.78.96:/tmp/test_logs
+    sudo scp -r /var/log/ imenkov@172.18.78.96:/tmp/test_logs
 }
 
 #######################################################################################################################
 # Functions for tests running
 function vm_test_full () {
-    echo mcv | sudo -S mcvconsoler --run custom full_mos
-    echo mcv | sudo -S mcvconsoler --run custom full_load
+    sudo -S mcvconsoler --run custom full_mos
+    sudo -S mcvconsoler --run custom full_load
 }
 
 function vm_test_rally () {
@@ -68,12 +68,12 @@ function vm_test_rally () {
 }
 
 function vm_test_ostf () {
-    echo mcv | sudo -S mcvconsoler --run custom ostf_61
+    sudo -S mcvconsoler --run custom ostf_61
 }
 
 # Running shaker test
 function vm_test_shaker () {
-    echo mcv | sudo -S mcvconsoler --run custom shaker
+    sudo -S mcvconsoler --run custom shaker
 }
 
 #######################################################################################################################
