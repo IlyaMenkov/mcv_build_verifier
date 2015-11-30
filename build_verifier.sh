@@ -12,7 +12,6 @@ function rd_cfg () {
     done < mcvbv.conf
 }
 
-
 function download_mcv_image () {
     MY_IP='http://172.18.160.121:9000/'
     ISO_IMAGE=$(curl ${MY_IP} | grep qcow2 | tail -1 | awk '{print $2}' | cut -c 7- | awk -F"\"" {'print $1'})
@@ -41,11 +40,19 @@ function controller_setup () {
 }
 
 function vm_setup () {
-    while read -r name
-    do
-    export $name
-    sudo -S sed -i '/\[basic\]/a'$name /etc/mcv/mcv.conf
-    done < mcvbv.conf
+    sudo -S sed -i '/\[basic\]/a'$controller_ip /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$instance_ip /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$os_username /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$os_tenant_name /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$os_password /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$auth_endpoint_ip /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$nailgun_host /etc/mcv/mcv.conf
+    sudo -S sed -i '/\[basic\]/a'$cluster_id /etc/mcv/mcv.conf
+#    while read -r name
+ #   do
+  #  export $name
+   #
+    #done < mcvbv.conf
 }
 
 #######################################################################################################################
@@ -96,6 +103,7 @@ controller_setup
 code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
+    ssh-keygen -f "/root/.ssh/known_hosts" -R $instance_ip
     ssh -t mcv@$instance_ip "$(typeset -f); vm_setup; vm_test_rally; save_logs;"
     code=$?
 done
