@@ -25,29 +25,35 @@ function controller_setup () {
     # Create image in glance
     c=$?
     glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $ISO_IMAGE --progress
-    if [ c!=0 ];then  exit 1; fi
+    c=$?
+    #if [ c!=0 ];then  exit 1; fi
     # Get network id from neutron
     network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ gsub (" ", "", $0); print}'`
-    if [ c!=0 ];then  exit 1; fi
+    c=$?
+    #if [ c!=0 ];then  exit 1; fi
     # Boot VM
     nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
-    if [ c!=0 ];then  exit 1; fi
     # Get new float ip and add security groups
+
+    #Create floating ip for instance
    # instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
+
+
     nova floating-ip-associate mcv_vm $instance_ip
     nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0
     nova secgroup-add-rule default tcp 22 22 0.0.0.0/0
 }
 
 function vm_setup () {
-    sudo -S sed -i '/\[basic\]/a'$controller_ip /etc/mcv/mcv.conf
-    sudo -S sed -i '/\[basic\]/a'$instance_ip /etc/mcv/mcv.conf
-    sudo -S sed -i '/\[basic\]/a'$os_username /etc/mcv/mcv.conf
-    sudo -S sed -i '/\[basic\]/a'$os_tenant_name /etc/mcv/mcv.conf
-    sudo -S sed -i '/\[basic\]/a'$os_password /etc/mcv/mcv.conf
-    sudo -S sed -i '/\[basic\]/a'$auth_endpoint_ip /etc/mcv/mcv.conf
-    sudo -S sed -i '/\[basic\]/a'$nailgun_host /etc/mcv/mcv.conf
-    sudo -S sed -i '/\[basic\]/a'$cluster_id /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/acontroller_ip=$1" /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/ainstance_ip=$2" /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/aos_username=$3" /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/aos_tenant_name=$4" /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/aos_password=$5" /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/aauth_endpoint_ip=$6" /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/anailgun_host=$7" /etc/mcv/mcv.conf
+    sudo sed -i "/\[basic\]/acluster_id=$8" /etc/mcv/mcv.conf
+
 #    while read -r name
  #   do
   #  export $name
@@ -104,7 +110,7 @@ code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
     ssh-keygen -f "/root/.ssh/known_hosts" -R $instance_ip
-    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup; vm_test_rally; save_logs;"
+    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id; vm_test_rally; save_logs;"
     code=$?
 done
 scp -r /tmp/mylogfile imenkov@172.18.78.96:/tmp/test_logs/
