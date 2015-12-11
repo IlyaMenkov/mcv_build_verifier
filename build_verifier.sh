@@ -1,5 +1,5 @@
 #!/bin/bash
-set-x
+set -x
 
 #######################################################################################################################
 
@@ -18,6 +18,7 @@ function download_mcv_image () {
     wget ${MY_IP}/${ISO_IMAGE}
 }
 
+
 function controller_setup () {
     sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config
     service ssh restart &>/tmp/filename
@@ -25,11 +26,11 @@ function controller_setup () {
     # Create image in glance
     c=$?
     glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $ISO_IMAGE --progress
-    c=$?
+
     #if [ c!=0 ];then  exit 1; fi
     # Get network id from neutron
     network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ gsub (" ", "", $0); print}'`
-    c=$?
+
     #if [ c!=0 ];then  exit 1; fi
     # Boot VM
     nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
@@ -53,12 +54,7 @@ function vm_setup () {
     sudo sed -i "/\[basic\]/aauth_endpoint_ip=$6" /etc/mcv/mcv.conf
     sudo sed -i "/\[basic\]/anailgun_host=$7" /etc/mcv/mcv.conf
     sudo sed -i "/\[basic\]/acluster_id=$8" /etc/mcv/mcv.conf
-
-#    while read -r name
- #   do
-  #  export $name
-   #
-    #done < mcvbv.conf
+    sudo sed -i "s/version=6.1/version=$9/" /etc/ssh/sshd_config
 }
 
 #######################################################################################################################
@@ -74,19 +70,47 @@ function vm_test_full () {
     sudo -S mcvconsoler --run custom full_load
 }
 
-function vm_test_rally () {
+function vm_test_default () {
     # Running tests
-    sudo -S mcvconsoler --run custom default
-    sudo -S mcvconsoler --run single rally neutron-create_and_list_routers.yaml
+    sudo mcvconsoler --run custom default &>>cli_output.log
+    c=$?
+    if ( c==0 ); then echo "Default test passed" ; else "Default test failed"; fi
+    sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml &>>cli_output.log
+    c=$?
+    if ( c==0 ); then echo "Single test passed" ; else "Single test failed"; fi
+    sudo mcvconsoler --run custom resources &>>cli_output.log
+    c=$?
+    if ( c==0 ); then echo "resources test passed" ; else "resources test failed"; fi
+}
+
+function vm_test_functional () {
+    sudo mcvconsoler --run custom functional &>>cli_output.log
+    c=$?
+    if ( c==0 ); then echo "Functional test passed" ; else "Functional test failed";fi
+}
+
+function vm_test_smoke () {
+    sudo mcvconsoler --run custom smoke &>>cli_output.log
+    c=$?
+    if ( c==0 ); then echo "Smoke test passed" ; else "Smoke test failed";fi
 }
 
 function vm_test_ostf () {
     sudo -S mcvconsoler --run custom ostf_61
 }
 
+function vm_test_quick () {
+    sudo mcvconsoler --run custom quick &>>cli_output.log
+    c=$?
+    if ( c==0 ); then echo "Quick test passed" ;else "Quick test failed";fi
+}
+
 # Running shaker test
 function vm_test_shaker () {
-    sudo -S mcvconsoler --run custom shaker
+    sudo -S mcvconsoler --run custom shaker &>>cli_output.log
+    c=$?
+    if ( c==0 ); then echo "Shaker test passed" ;else "Shaker test failed";fi
+
 }
 
 #######################################################################################################################
@@ -110,7 +134,9 @@ code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
     ssh-keygen -f "/root/.ssh/known_hosts" -R $instance_ip
-    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id; vm_test_rally; save_logs;"
+
+
+    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; vm_test_default"
     code=$?
 done
 scp -r /tmp/mylogfile imenkov@172.18.78.96:/tmp/test_logs/
