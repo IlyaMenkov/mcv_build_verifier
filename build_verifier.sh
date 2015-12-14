@@ -74,25 +74,28 @@ function vm_test_default () {
     # Running tests
     sudo mcvconsoler --run custom default &>>cli_output.log
     c=$?
-    if ( c==0 ); then echo "Default test passed" ; else "Default test failed"; fi
+    echo $c
+    if ( $c==0 ); then echo "Default test passed" ; else "Default test failed"; fi
     sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml &>>cli_output.log
     c=$?
-    if ( c==0 ); then echo "Single test passed" ; else "Single test failed"; fi
+    echo $c
+    if ( $c==0 ); then echo "Single test passed" ; else "Single test failed"; fi
     sudo mcvconsoler --run custom resources &>>cli_output.log
     c=$?
-    if ( c==0 ); then echo "resources test passed" ; else "resources test failed"; fi
+    echo $c
+    if ( $c==0 ); then echo "resources test passed" ; else "resources test failed"; fi
 }
 
 function vm_test_functional () {
     sudo mcvconsoler --run custom functional &>>cli_output.log
     c=$?
-    if ( c==0 ); then echo "Functional test passed" ; else "Functional test failed";fi
+    if ( $c==0 ); then echo "Functional test passed" ; else "Functional test failed";fi
 }
 
 function vm_test_smoke () {
     sudo mcvconsoler --run custom smoke &>>cli_output.log
     c=$?
-    if ( c==0 ); then echo "Smoke test passed" ; else "Smoke test failed";fi
+    if ( $c==0 ); then echo "Smoke test passed" ; else "Smoke test failed";fi
 }
 
 function vm_test_ostf () {
@@ -102,14 +105,14 @@ function vm_test_ostf () {
 function vm_test_quick () {
     sudo mcvconsoler --run custom quick &>>cli_output.log
     c=$?
-    if ( c==0 ); then echo "Quick test passed" ;else "Quick test failed";fi
+    if ( $c==0 ); then echo "Quick test passed" ;else echo "Quick test failed";fi
 }
 
 # Running shaker test
 function vm_test_shaker () {
     sudo -S mcvconsoler --run custom shaker &>>cli_output.log
     c=$?
-    if ( c==0 ); then echo "Shaker test passed" ;else "Shaker test failed";fi
+    if ( $c==0 ); then echo "Shaker test passed" ;else "Shaker test failed";fi
 
 }
 
@@ -133,8 +136,6 @@ controller_setup
 code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
-    ssh-keygen -f "/root/.ssh/known_hosts" -R $instance_ip
-
 
     ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; vm_test_default"
     code=$?
