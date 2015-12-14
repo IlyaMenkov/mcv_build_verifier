@@ -79,23 +79,23 @@ function vm_test_default () {
     sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml &>>cli_output.log
     c=$?
     echo $c
-    if ( $c==0 ); then echo "Single test passed" ; else "Single test failed"; fi
+    if [ $c -eq 0 ]; then echo "Single test passed" ; else echo "Single test failed"; fi
     sudo mcvconsoler --run custom resources &>>cli_output.log
     c=$?
     echo $c
-    if ( $c==0 ); then echo "resources test passed" ; else "resources test failed"; fi
+    if [ $c -eq 0 ]; then echo "resource test passed" ; else echo "resoutce test failed"; fi
 }
 
 function vm_test_functional () {
     sudo mcvconsoler --run custom functional &>>cli_output.log
     c=$?
-    if ( $c==0 ); then echo "Functional test passed" ; else "Functional test failed";fi
+    if [ $c -eq 0 ]; then echo "Functional test passed" ; else echo "functional test failed"; fi
 }
 
 function vm_test_smoke () {
     sudo mcvconsoler --run custom smoke &>>cli_output.log
     c=$?
-    if ( $c==0 ); then echo "Smoke test passed" ; else "Smoke test failed";fi
+    if [ $c -eq 0 ]; then echo "smoke test passed" ; else echo "smoke test failed"; fi
 }
 
 function vm_test_ostf () {
@@ -105,14 +105,14 @@ function vm_test_ostf () {
 function vm_test_quick () {
     sudo mcvconsoler --run custom quick &>>cli_output.log
     c=$?
-    if ( $c==0 ); then echo "Quick test passed" ;else echo "Quick test failed";fi
+    if [ $c -eq 0 ]; then echo "quick test passed" ; else echo "quick test failed"; fi
 }
 
 # Running shaker test
 function vm_test_shaker () {
     sudo -S mcvconsoler --run custom shaker &>>cli_output.log
     c=$?
-    if ( $c==0 ); then echo "Shaker test passed" ;else "Shaker test failed";fi
+    if [ $c -eq 0 ]; then echo "shaker test passed" ; else echo "Shaker test failed"; fi
 
 }
 
@@ -139,5 +139,6 @@ while [[ $code != 0 ]]; do
 
     ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; vm_test_default"
     code=$?
+    echo $code
 done
 scp -r /tmp/mylogfile imenkov@172.18.78.96:/tmp/test_logs/
