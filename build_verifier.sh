@@ -60,7 +60,10 @@ function vm_setup () {
 #######################################################################################################################
 # Save logs from instance on my PC
 function save_logs () {
-    sudo scp -r /var/log/ imenkov@172.18.78.96:/tmp/test_logs
+    sudo scp -r /var/log/ root@$1:~/mcv_build_verifier/logs/
+    sudo scp -r cli_output.log root@$1:~/mcv_build_verifier/
+    sudo scp -r results.log root@$1:~/mcv_build_verifier/
+
 }
 
 #######################################################################################################################
@@ -75,27 +78,27 @@ function vm_test_default () {
     sudo mcvconsoler --run custom default &>>cli_output.log
     c=$?
     echo $c
-    if ( $c==0 ); then echo "Default test passed" ; else "Default test failed"; fi
+    if [ $c -eq 0 ]; then echo "default test passed" &>>results.log; else echo "default test failed" &>>results.log; fi
     sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml &>>cli_output.log
     c=$?
     echo $c
-    if [ $c -eq 0 ]; then echo "Single test passed" ; else echo "Single test failed"; fi
+    if [ $c -eq 0 ]; then echo "Single test passed" &>>results.log; else echo "Single test failed" &>>results.log; fi
     sudo mcvconsoler --run custom resources &>>cli_output.log
     c=$?
     echo $c
-    if [ $c -eq 0 ]; then echo "resource test passed" ; else echo "resoutce test failed"; fi
+    if [ $c -eq 0 ]; then echo "resource test passed" &>>results.log; else echo "resoutce test failed" &>>results.log; fi
 }
 
 function vm_test_functional () {
     sudo mcvconsoler --run custom functional &>>cli_output.log
     c=$?
-    if [ $c -eq 0 ]; then echo "Functional test passed" ; else echo "functional test failed"; fi
+    if [ $c -eq 0 ]; then echo "Functional test passed" &>>results.log; else echo "functional test failed"&>>results.log; fi
 }
 
 function vm_test_smoke () {
     sudo mcvconsoler --run custom smoke &>>cli_output.log
     c=$?
-    if [ $c -eq 0 ]; then echo "smoke test passed" ; else echo "smoke test failed"; fi
+    if [ $c -eq 0 ]; then echo "smoke test passed" &>>results.log; else echo "smoke test failed" &>>results.log; fi
 }
 
 function vm_test_ostf () {
@@ -105,14 +108,14 @@ function vm_test_ostf () {
 function vm_test_quick () {
     sudo mcvconsoler --run custom quick &>>cli_output.log
     c=$?
-    if [ $c -eq 0 ]; then echo "quick test passed" ; else echo "quick test failed"; fi
+    if [ $c -eq 0 ]; then echo "quick test passed" &>>results.log ; else echo "quick test failed" &>>results.log; fi
 }
 
 # Running shaker test
 function vm_test_shaker () {
     sudo -S mcvconsoler --run custom shaker &>>cli_output.log
     c=$?
-    if [ $c -eq 0 ]; then echo "shaker test passed" ; else echo "Shaker test failed"; fi
+    if [ $c -eq 0 ]; then echo "shaker test passed" &>>results.log; else echo "Shaker test failed" &>>results.log; fi
 
 }
 
@@ -137,8 +140,11 @@ code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
 
-    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; vm_test_default"
+    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; vm_test_default; save_logs $instance_ip;"
     code=$?
     echo $code
 done
-scp -r /tmp/mylogfile imenkov@172.18.78.96:/tmp/test_logs/
+echo "image testing was finished"
+echo "logs from mcv instance in mcv_build_verifier/logs/"
+echo "results are saved in mcv_build_verifier/results.log"
+sudo scp -r /var/log/ root@172.16.0.4:~/mcv_build_verifier/logs/
