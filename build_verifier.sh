@@ -119,10 +119,63 @@ function vm_test_shaker () {
 
 }
 
+function self_test () {
+    selfCheck=0
+    b=directory
+    # Check that /opt/mcv-consoler is exist
+    a=`file /opt/mcv-consoler | awk {'print $2'}`
+    if [[ $a -eq $b ]];
+    then
+        echo "consoler dirrectory - OK" >> selfCheck.log;
+    else
+        echo "consoler not over here /opt/mcv-consoler" >> selfCheck.log;
+        selfCheck=1
+    fi
+    # Check that /opt/mcv-board exist
+    a=`file /opt/mcv-board | awk {'print $2'}`
+    if [[ $a -eq $b ]];
+    then
+        echo "consoler board exist - OK" >> selfCheck.log;
+    else
+        echo "consoler board not exist" >> selfCheck.log;
+        selfCheck=1
+    fi
+
+    # Check that mcv.conf exist
+    b=ASCII
+    a=`file /etc/mcv/mcv.conf | awk {'print $2'}`
+    if [[ $a -eq $b ]];
+    then
+        echo "mcv.conf exist - OK" >> selfCheck.log;
+    else
+        echo "mcv.conf not exist" >> selfCheck.log;
+        selfCheck=1
+    fi
+
+    # Check that /etc/hosts exist
+    #b=ASCII
+    a=`file /etc/hosts | awk {'print $2'}`
+    if [[ $a -eq $b ]];
+    then
+        echo "file hosts exist - OK" >> selfCheck.log;
+    else
+        echo "file hosts not exist" >> selfCheck.log;
+        selfCheck=1
+    fi
+
+    dockers=(mcv-tempest mcv-rally mcv-wally mcv-ostf70 mcv-ostf61 mcv-shaker)
+    for i in ${dockers[*]}
+    do
+        docker ps -a | grep Created | awk {'print $2'} | grep $i
+        if [ $? -eq 1 ]; then echo "can not find docker $i"; selfCheck=1; fi
+    done
+
+    if [ selfCheck -eq 1 ]; then echo "self test failed"; sleep 2m; fi
+}
+
 #######################################################################################################################
 #download image from google drive
 #python mcv_build_verifier/main.py
-
 
 # Export credentials
 rd_cfg
@@ -133,17 +186,16 @@ download_mcv_image
 # Setup ssh on controller
 controller_setup
 
-
 #######################################################################################################################
 # Trying connect to VM using ssh and run tests
 code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
-
-    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; vm_test_default; save_logs $instance_ip;"
+    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; self_test; vm_test_default; save_logs $controller_ip;"
     code=$?
     echo $code
 done
+
 echo "image testing was finished"
 echo "logs from mcv instance in mcv_build_verifier/logs/"
 echo "results are saved in mcv_build_verifier/results.log"
