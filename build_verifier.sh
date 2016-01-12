@@ -11,8 +11,16 @@ function rd_cfg () {
     done < mcvbv.conf
 }
 
+# Get image url from IMG_LOCATION or img_url in config file
 function download_mcv_image () {
-    wget $1
+    if [ -z ${IMG_LOCATION+x} ]
+    then
+        echo "Using config file $1"
+        wget $1
+    else
+        echo "using IMG_LOCATION=$IMG_LOCATION"
+        wget $IMG_LOCATION
+    fi
 }
 
 function controller_setup () {
