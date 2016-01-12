@@ -191,7 +191,7 @@ controller_setup
 code=1
 while [[ $code != 0 ]]; do
     sleep 5m # wait while vm deploying
-    ssh -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; self_test; vm_test_default; save_logs $controller_ip;"
+    ssh -o StrictHostKeyChecking=no -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; self_test; vm_test_default; save_logs $controller_ip;"
     code=$?
     echo $code
 done
