@@ -2,7 +2,6 @@
 set -x
 
 #######################################################################################################################
-
 # Set up functions for controller and mcv instance
 #read config
 function rd_cfg () {
@@ -13,11 +12,8 @@ function rd_cfg () {
 }
 
 function download_mcv_image () {
-    MY_IP='http://172.18.160.121:9000/'
-    ISO_IMAGE=$(curl ${MY_IP} | grep qcow2 | tail -1 | awk '{print $2}' | cut -c 7- | awk -F"\"" {'print $1'})
-    wget ${MY_IP}/${ISO_IMAGE}
+    wget $1
 }
-
 
 function controller_setup () {
     sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config
@@ -60,15 +56,15 @@ function vm_setup () {
 #######################################################################################################################
 # Save logs from instance on my PC
 function save_logs () {
-    sudo scp -r /var/log/ root@$1:~/mcv_build_verifier/logs/
-    sudo scp -r cli_output.log root@$1:~/mcv_build_verifier/
-    sudo scp -r results.log root@$1:~/mcv_build_verifier/
+    sudo scp -r /var/log/ root@$1:~/tmp
+    sudo scp -r cli_output.log root@$1:~/tmp
+    sudo scp -r results.log root@$1:~/tmp
 
 }
 
 #######################################################################################################################
 # Functions for tests running
-function vm_test_full () {
+function vm_test_full_mos_load () {
     sudo -S mcvconsoler --run custom full_mos
     sudo -S mcvconsoler --run custom full_load
 }
@@ -173,15 +169,11 @@ function self_test () {
     if [ selfCheck -eq 1 ]; then echo "self test failed"; sleep 2m; fi
 }
 
-#######################################################################################################################
-#download image from google drive
-#python mcv_build_verifier/main.py
-
 # Export credentials
 rd_cfg
 
 # Download mcv image
-download_mcv_image
+download_mcv_image $image_link
 
 # Setup ssh on controller
 controller_setup
@@ -199,4 +191,3 @@ done
 echo "image testing was finished"
 echo "logs from mcv instance in mcv_build_verifier/logs/"
 echo "results are saved in mcv_build_verifier/results.log"
-sudo scp -r /var/log/ root@172.16.0.4:~/mcv_build_verifier/logs/
