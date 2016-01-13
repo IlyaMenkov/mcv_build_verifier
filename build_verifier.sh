@@ -4,51 +4,100 @@ set -x
 #######################################################################################################################
 # Set up functions for controller and mcv instance
 #read config
+
+# we have next variables
+# from mcvbv.conf
+#controller_ip                      - for connect on controller, also change in mcv image
+#os_username=admin                  - for mcv config
+#os_tenant_name=admin               - for mcv config
+#os_password=admin                  - for mcv config
+#auth_endpoint_ip=172.16.0.3        - for mcv config
+#nailgun_host=172.16.0.1            - for mcv config
+#cluster_id=4                       - for mcv config
+#version=7.0                        - for mcv config
+#image_url=image_url                - for mcv config
+#ssh_key_loc=/path/to/key           - for mcv config
+# other
+# image_name                        -for using on controller
 function rd_cfg () {
+    # read and export all creds from mcvbv.conf
     while read -r name
     do
     export $name
     done < mcvbv.conf
-}
 
-# Get image url from IMG_LOCATION or img_url in config file
-function download_mcv_image () {
+    # check image location
     if [ -z ${IMG_LOCATION+x} ]
     then
-        echo "Using config file $1"
-        wget $1
+        echo "Using config file $image_url"
     else
         echo "using IMG_LOCATION=$IMG_LOCATION"
-        wget $IMG_LOCATION
+        export image_url=$IMG_LOCATION
+    fi
+    export image_name=$image_url | awk -F"/" {'print $NF'}
+
+    # check ssh key location
+    if [ -z ${SSH_KEY_LOCATION+x} ]
+    then
+        echo "Using config file, path to key: $ssh_key_loc"
+    else
+        echo "using ssh_hey_locationm path to key: $SSH_KEY_LOCATION"
+        export ssh_key_loc=$SSH_KEY_LOCATION
     fi
 }
 
+# this function will run when we are already connected to master node or when we have ssh key from master node
+function controller_ssh () {
+    ssh -o StrictHostKeyChecking=no -i $ssh_key_loc $controller_ip -t "$(typeset -f); download_mcv_image $image_link; controller_setup $image_name vm_ssh $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id $version"
+}
+
+# Get mcv image from url
+function download_mcv_image () {
+    wget $1
+}
+
+
 function controller_setup () {
+    . openrc
+    # change PasswordAuthentication for correct work MCV tool
     sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config
-    service ssh restart &>/tmp/filename
+    service ssh restart
 
     # Create image in glance
-    c=$?
-    glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $ISO_IMAGE --progress
+    glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $1 --progress
 
-    #if [ c!=0 ];then  exit 1; fi
     # Get network id from neutron
     network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ gsub (" ", "", $0); print}'`
 
-    #if [ c!=0 ];then  exit 1; fi
     # Boot VM
     nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
-    # Get new float ip and add security groups
 
-    #Create floating ip for instance
-   # instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
+    # Create and attach floating ip for instance
+
+   # instance_ip=`nova floating-ip-list | grep ext | awk -F"|" '{print $3}' | sed 's/^.//'`
+    instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
 
 
     nova floating-ip-associate mcv_vm $instance_ip
+
+    #add security groups
     nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0
     nova secgroup-add-rule default tcp 22 22 0.0.0.0/0
 }
 
+#######################################################################################################################
+# Trying connect to VM using ssh and run tests
+function vm_ssh () {
+code=1
+while [[ $code != 0 ]]; do
+    sleep 5m # wait while vm deploying
+    ssh -o StrictHostKeyChecking=no -t mcv@$2 "$(typeset -f); vm_setup $1 $2 $3 $4 $5 $6 $7 $8 $9; self_test; vm_test_default;"
+    code=$?
+    echo $code
+done
+}
+
+# change creds in /etc/mcv/mcv.conf on mcv instance
 function vm_setup () {
     sudo sed -i "/\[basic\]/acontroller_ip=$1" /etc/mcv/mcv.conf
     sudo sed -i "/\[basic\]/ainstance_ip=$2" /etc/mcv/mcv.conf
@@ -62,65 +111,43 @@ function vm_setup () {
 }
 
 #######################################################################################################################
-# Save logs from instance on my PC
-function save_logs () {
-    sudo scp -r /var/log/ root@$1:~/tmp
-    sudo scp -r cli_output.log root@$1:~/tmp
-    sudo scp -r results.log root@$1:~/tmp
-
-}
+# Save logs from instance
+#function save_logs () {
+#    sudo scp -r /var/log/ root@$1:~/tmp
+#    sudo scp -r cli_output.log root@$1:~/tmp
+#    sudo scp -r results.log root@$1:~/tmp
+#
+#}
 
 #######################################################################################################################
-# Functions for tests running
-function vm_test_full_mos_load () {
-    sudo -S mcvconsoler --run custom full_mos
-    sudo -S mcvconsoler --run custom full_load
-}
-
-function vm_test_default () {
-    # Running tests
+# Functionm for tests running
+function vm_test_full () {
     sudo mcvconsoler --run custom default &>>cli_output.log
-    c=$?
-    echo $c
+    c=$?; echo $c
     if [ $c -eq 0 ]; then echo "default test passed" &>>results.log; else echo "default test failed" &>>results.log; fi
     sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml &>>cli_output.log
-    c=$?
-    echo $c
+    c=$?; echo $c
     if [ $c -eq 0 ]; then echo "Single test passed" &>>results.log; else echo "Single test failed" &>>results.log; fi
     sudo mcvconsoler --run custom resources &>>cli_output.log
-    c=$?
-    echo $c
+    c=$?; echo $c
     if [ $c -eq 0 ]; then echo "resource test passed" &>>results.log; else echo "resoutce test failed" &>>results.log; fi
-}
+    c=$?; echo $c
 
-function vm_test_functional () {
     sudo mcvconsoler --run custom functional &>>cli_output.log
-    c=$?
+    c=$?; echo $c
     if [ $c -eq 0 ]; then echo "Functional test passed" &>>results.log; else echo "functional test failed"&>>results.log; fi
-}
 
-function vm_test_smoke () {
     sudo mcvconsoler --run custom smoke &>>cli_output.log
-    c=$?
+    c=$?; echo $c
     if [ $c -eq 0 ]; then echo "smoke test passed" &>>results.log; else echo "smoke test failed" &>>results.log; fi
-}
 
-function vm_test_ostf () {
-    sudo -S mcvconsoler --run custom ostf_61
-}
-
-function vm_test_quick () {
     sudo mcvconsoler --run custom quick &>>cli_output.log
-    c=$?
+    c=$?; echo $c
     if [ $c -eq 0 ]; then echo "quick test passed" &>>results.log ; else echo "quick test failed" &>>results.log; fi
-}
 
-# Running shaker test
-function vm_test_shaker () {
     sudo -S mcvconsoler --run custom shaker &>>cli_output.log
-    c=$?
+    c=$?; echo $c
     if [ $c -eq 0 ]; then echo "shaker test passed" &>>results.log; else echo "Shaker test failed" &>>results.log; fi
-
 }
 
 function self_test () {
@@ -174,28 +201,27 @@ function self_test () {
         if [ $? -eq 1 ]; then echo "can not find docker $i"; selfCheck=1; fi
     done
 
-    if [ selfCheck -eq 1 ]; then echo "self test failed"; sleep 2m; fi
+    if [ selfCheck -eq 1 ]; then echo "self test failed"; fi
 }
 
-# Export credentials
-rd_cfg
 
-# Download mcv image
-download_mcv_image $image_link
+
 
 # Setup ssh on controller
 controller_setup
 
-#######################################################################################################################
-# Trying connect to VM using ssh and run tests
-code=1
-while [[ $code != 0 ]]; do
-    sleep 5m # wait while vm deploying
-    ssh -o StrictHostKeyChecking=no -t mcv@$instance_ip "$(typeset -f); vm_setup $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id 7.0; self_test; vm_test_default; save_logs $controller_ip;"
-    code=$?
-    echo $code
-done
 
 echo "image testing was finished"
-echo "logs from mcv instance in mcv_build_verifier/logs/"
-echo "results are saved in mcv_build_verifier/results.log"
+
+
+
+
+
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# just RUNNING
+# Export credentials
+rd_cfg
+# connect to controller and etc
+node_ssh $ssh_key_location_conf
