@@ -70,16 +70,16 @@ function download_mcv_image () {
 function controller_setup () {
 
     controller_ip=$1
-    instance_ip=$2
-    os_username=$3
-    os_tenant_name=$4
-    os_password=$5
-    auth_endpoint_ip=$6
-    nailgun_host=$7
-    cluster_id=$8
-    version=$9
-    private_endpoint_ip=$10
-    image_name=$11
+   # instance_ip=$2
+    os_username=$2
+    os_tenant_name=$3
+    os_password=$4
+    auth_endpoint_ip=$5
+    nailgun_host=$6
+    cluster_id=$7
+    version=$8
+    #private_endpoint_ip=$10
+    image_name=$9
 
     . openrc
     sudo apt-get install sshpass
@@ -88,8 +88,7 @@ function controller_setup () {
     service ssh restart
 
     # Create image in glance
-    glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $image_name \
-    --progress
+    glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $image_name --progress
 
     # Get network id from neutron
     network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ gsub (" ", "", $0); print}'`
