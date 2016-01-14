@@ -44,24 +44,21 @@ function rd_cfg () {
         echo "using ssh_hey_locationm path to key: $SSH_KEY_LOCATION"
         export ssh_key_loc=$SSH_KEY_LOCATION
     fi
+
+    if [ -z ${instance_ip+x} ]
+    then
+        echo "instance_ip doesn't set in mcvbv.conf"
+        instance_ip="0"
+    fi
 }
 
-# we have next variables
-# from mcvbv.conf
-#controller_ip                      - for connect on controller, also change in mcv image
-#os_username=admin                  - for mcv config
-#os_tenant_name=admin               - for mcv config
-#os_password=admin                  - for mcv config
-#auth_endpoint_ip=172.16.0.3        - for mcv config
-#nailgun_host=172.16.0.1            - for mcv config
-#cluster_id=4                       - for mcv config
-#version=7.0                        - for mcv config
-#image_url=image_url                - for mcv config
-#ssh_key_loc=/path/to/key           - for mcv config
 
 # this function will run when we are already connected to master node or when we have ssh key from master node
 function controller_ssh () {
-    ssh -o StrictHostKeyChecking=no -i $ssh_key_loc root@$controller_ip -t "$(typeset -f); controller_setup $controller_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id $version" # $image_url" # $image_name"
+    ssh -o StrictHostKeyChecking=no -i $ssh_key_loc root@$controller_ip -t "$(typeset -f); \
+        download_mcv_image $image_url; controller_setup $controller_ip $instance_ip $os_username \
+        $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host $cluster_id $version $private_endpoint_ip \
+        $image_name"
 }
 
 # Get mcv image from url
@@ -71,32 +68,48 @@ function download_mcv_image () {
 
 
 function controller_setup () {
+
+    controller_ip=$1
+    instance_ip=$2
+    os_username=$3
+    os_tenant_name=$4
+    os_password=$5
+    auth_endpoint_ip=$6
+    nailgun_host=$7
+    cluster_id=$8
+    version=$9
+    private_endpoint_ip=$10
+    image_name=$11
+
     . openrc
+    sudo apt-get install sshpass
     # change PasswordAuthentication for correct work MCV tool
     sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config
     service ssh restart
 
     # Create image in glance
-   # glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $1 --progress
+    glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file $image_name \
+    --progress
 
     # Get network id from neutron
     network_id=`neutron net-list | grep 'net04 ' | awk -F"|" {'print $2'} | awk '{ gsub (" ", "", $0); print}'`
     echo $network_id
     # Boot VM
-   # nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
+    nova boot --image mcv --flavor m1.large --nic net-id=$network_id mcv_vm
 
     # Create and attach floating ip for instance
 
-    instance_ip="172.16.0.131" #`nova floating-ip-list | grep ext | awk -F"|" '{print $3}' | sed 's/^.//'`
-   # instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
-
-    echo $instance_ip
-# nova floating-ip-associate mcv_vm $instance_ip
-
+    #instance_ip=`nova floating-ip-list | grep ext | awk -F"|" '{print $3}' | sed 's/^.//'`
+    if [ instance_ip == "0" ]
+    then
+        instance_ip=`nova floating-ip-create | grep 'net04' | awk -F"|" {'print $3'} | awk '{ gsub (" ", "", $0); print}'`
+    fi
+    nova floating-ip-associate mcv_vm $instance_ip
     #add security groups
     nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0
     nova secgroup-add-rule default tcp 22 22 0.0.0.0/0
-    vm_ssh $1 $instance_ip $2 $3 $4 $5 $6 $7 $8
+    vm_ssh $controller_ip $instance_ip $os_username $os_tenant_name $os_password $auth_endpoint_ip $nailgun_host \
+           $cluster_id $version
 }
 
 #######################################################################################################################
@@ -123,6 +136,8 @@ function vm_setup () {
     sudo sed -i "/\[basic\]/anailgun_host=$7" /etc/mcv/mcv.conf
     sudo sed -i "/\[basic\]/acluster_id=$8" /etc/mcv/mcv.conf
     sudo sed -i "s/version=6.1/version=$9/" /etc/mcv/mcv.conf
+  #  sudo sed -i "s/private_endpoint_ip=192.168.0.2/private_endpoint_ip=$10" /etc/mcv/mcv.conf
+
 }
 
 #######################################################################################################################
@@ -137,7 +152,7 @@ function vm_setup () {
 #######################################################################################################################
 # Functionm for tests running
 function vm_test_full () {
-    sudo mcvconsoler --run custom default 
+    sudo mcvconsoler --run custom default &>>cli_output.log
     c=$?; echo $c
     if [ $c -eq 0 ]; then echo "default test passed"; else echo "default test failed" &>>results.log; fi
     sudo mcvconsoler --run single rally neutron-create_and_list_routers.yaml &>>cli_output.log
@@ -152,17 +167,17 @@ function vm_test_full () {
 #    c=$?; echo $c
 #    if [ $c -eq 0 ]; then echo "Functional test passed" &>>results.log; else echo "functional test failed"&>>results.log; fi
 
-#    sudo mcvconsoler --run custom smoke &>>cli_output.log
-#    c=$?; echo $c
-#    if [ $c -eq 0 ]; then echo "smoke test passed" &>>results.log; else echo "smoke test failed" &>>results.log; fi
+    sudo mcvconsoler --run custom smoke &>>cli_output.log
+ #   c=$?; echo $c
+ #   if [ $c -eq 0 ]; then echo "smoke test passed" &>>results.log; else echo "smoke test failed" &>>results.log; fi
 #
 #    sudo mcvconsoler --run custom quick &>>cli_output.log
 #    c=$?; echo $c
 #    if [ $c -eq 0 ]; then echo "quick test passed" &>>results.log ; else echo "quick test failed" &>>results.log; fi
 #
-#    sudo -S mcvconsoler --run custom shaker &>>cli_output.log
-#    c=$?; echo $c
-#    if [ $c -eq 0 ]; then echo "shaker test passed" &>>results.log; else echo "Shaker test failed" &>>results.log; fi
+    sudo -S mcvconsoler --run custom shaker &>>cli_output.log
+    c=$?; echo $c
+    if [ $c -eq 0 ]; then echo "shaker test passed" &>>results.log; else echo "Shaker test failed" &>>results.log; fi
 }
 
 function self_test () {
