@@ -59,14 +59,15 @@ if __name__ == "__main__":
     ssh.connect(CONF.basic.controller_ip, username='root', password='r00tme', key_filename='/tmp/id_rsa')
     qqq, www, eee = ssh.exec_command(
                                     '. openrc'
-                                    '&& instance_ip=`nova floating-ip-create | grep \'net04\' | awk -F"|" {\'print $3\'} | awk \'{ gsub (" ", "", $0); print}\'` >> controller_log.log '
+                                    '&& instance_ip=`nova floating-ip-create | grep \'net04\' | awk -F"|" {\'print $3\'} | awk \'{ gsub (" ", "", $0); print}\'`'
                                     '&& echo $instance_ip '
-                                    '&& %s '
+                                    '&& %s'
                                     '&& sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config >> controller_log.log '
                                     '&& service ssh restart >> controller_setups.log'
                                     '&& glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file %s --progress >> controller_log.log '
                                     '&& network_id=`neutron net-list | grep \'net04 \' | awk -F"|" {\'print $2\'} | awk \'{ gsub (" ", "", $0); print}\'` >> controller_log.log '
-                                    '&& nova boot --image mcv --flavor m1.medium --nic net-id=$network_id mcv_vm >> controller_log.log '
+                                    '&& nova boot --image mcv --flavor m1.medium --nic net-id=$network_id mcv_vm >> controller_log.log'
+                                    '&& sleep 0 10'
                                     '&& nova floating-ip-associate mcv_vm $instance_ip >> controller_log.log '
                                     '&& nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0 >> controller_log.log '
                                     '&& nova secgroup-add-rule default tcp 22 22 0.0.0.0/0 >> controller_log.log '
@@ -93,9 +94,8 @@ if __name__ == "__main__":
                                     'sudo sed -i "/\[basic\]/anailgun_host=%s" /etc/mcv/mcv.conf &&'
                                     'sudo sed -i "/\[basic\]/acluster_id=%s" /etc/mcv/mcv.conf &&'
                                     'sudo sed -i "s/version=6.1/version=%s/" /etc/mcv/mcv.conf &&'
-                                    'sudo mcvconsoler --run custom resources >> mcv_cli_output.log &&'
-                                    'sudo mcvconsoler --run custom default >> mcv_cli_output.log &&'
-                                    'sudo mcvconsoler --run custom shaker >> mcv_cli_output.log'
+                                    'sudo mcvconsoler --run custom resources >> mcv_cli_output.log && echo $? &&'
+                                    'sudo mcvconsoler --run custom default >> mcv_cli_output.log && echo $? &&'
                                     'cat mcv_cli_output.log'
                                     % (str(CONF.basic.controller_ip), instance_ip, str(CONF.basic.os_username), str(CONF.basic.os_tenant_name),
                                        str(CONF.basic.os_password), str(CONF.basic.auth_endpoint_ip), str(CONF.basic.nailgun_host),
