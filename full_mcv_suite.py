@@ -42,47 +42,47 @@ if __name__ == "__main__":
 
     # WHUT?
     # create image name from image url
-    ControllerImagePath=str(CONF.basic.image_url)#.split('/')[-1])
+    ControllerImagePath=('/var/lib/mysql/images/' +str(CONF.basic.image_url).split('/')[-1])
 
     # WHUT?
     # understanding what we need to use: wget or just path to mcv image
     if CONF.basic.image_url[0:4]=='http':
-        getting_image_command="wget " + str(CONF.basic.image_url) #+ " -P /var/lib/mysql/images/ >> controller_log.log"
+        getting_image_command="wget -q " + str(CONF.basic.image_url) + " -P /var/lib/mysql/images/"
         print (getting_image_command)
     else:
         print ("use default path to image")
         getting_image_command="echo using path to image >> controller_log.log"
 
+
+# work with controller
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(CONF.basic.controller_ip, username='root', password='r00tme', key_filename='/tmp/id_rsa')
+    qqq, www, eee = ssh.exec_command(
+                                    '. openrc'
+                                    '&& instance_ip=`nova floating-ip-create | grep \'net04\' | awk -F"|" {\'print $3\'} | awk \'{ gsub (" ", "", $0); print}\'`'
+                                    '&& echo $instance_ip '
+                                    '&& %s'
+                                    '&& sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config >> controller_log.log '
+                                    '&& service ssh restart >> controller_setups.log'
+                                    '&& glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file %s --progress >> controller_log.log '
+                                    '&& network_id=`neutron net-list | grep \'net04 \' | awk -F"|" {\'print $2\'} | awk \'{ gsub (" ", "", $0); print}\'` >> controller_log.log '
+                                    '&& nova boot --image mcv --flavor m1.medium --nic net-id=$network_id mcv_vm >> controller_log.log'
+                                    '&& sleep 0 10'
+                                    '&& nova floating-ip-associate mcv_vm $instance_ip >> controller_log.log '
+                                    '&& nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0 >> controller_log.log '
+                                    '&& nova secgroup-add-rule default tcp 22 22 0.0.0.0/0 >> controller_log.log '
+                                    % (getting_image_command, ControllerImagePath)
+                                    )
+
+    sshoutput=www.readlines()
+    print (sshoutput)
+    instance_ip = (sshoutput[0]).rstrip('\n')
+    ssh.close()
 #
-## work with controller
-#    ssh = paramiko.SSHClient()
-#    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#    ssh.connect(CONF.basic.controller_ip, username='root', password='r00tme', key_filename='/tmp/id_rsa')
-#    qqq, www, eee = ssh.exec_command(
-#                                    '. openrc'
-#                                    '&& instance_ip=`nova floating-ip-create | grep \'net04\' | awk -F"|" {\'print $3\'} | awk \'{ gsub (" ", "", $0); print}\'`'
-#                                    '&& echo $instance_ip '
-#                                    '&& %s'
-#                                    '&& sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" /etc/ssh/sshd_config >> controller_log.log '
-#                                    '&& service ssh restart >> controller_setups.log'
-#                                    '&& glance image-create --name mcv --disk-format qcow2 --container-format bare --is-public true --file %s --progress >> controller_log.log '
-#                                    '&& network_id=`neutron net-list | grep \'net04 \' | awk -F"|" {\'print $2\'} | awk \'{ gsub (" ", "", $0); print}\'` >> controller_log.log '
-#                                    '&& nova boot --image mcv --flavor m1.medium --nic net-id=$network_id mcv_vm >> controller_log.log'
-#                                    '&& sleep 0 10'
-#                                    '&& nova floating-ip-associate mcv_vm $instance_ip >> controller_log.log '
-#                                    '&& nova secgroup-add-rule default icmp -1 -1 0.0.0.0/0 >> controller_log.log '
-#                                    '&& nova secgroup-add-rule default tcp 22 22 0.0.0.0/0 >> controller_log.log '
-#                                    % (getting_image_command, ControllerImagePath)
-#                                    )
-#
-#    sshoutput=www.readlines()
-#    print (sshoutput)
-#    instance_ip = (sshoutput[0]).rstrip('\n')
-#    ssh.close()
-#
-#    print('I am go to sleep with instance ip')
-   # time.sleep(1200)
-    instance_ip='172.16.0.131'
+    print('I am go to sleep with instance ip')
+    time.sleep(1200)
+    #instance_ip='172.16.0.131'
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
