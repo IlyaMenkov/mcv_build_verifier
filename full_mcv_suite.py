@@ -41,17 +41,14 @@ if __name__ == "__main__":
           CONF.basic.auth_endpoint_ip,CONF.basic.nailgun_host,CONF.basic.cluster_id,CONF.basic.version,
           CONF.basic.private_endpoint_ip,CONF.basic.image_url,CONF.basic.ssh_key_loc)
 
-    # WHUT?
-    # create image name from image url
-    ControllerImagePath=('/var/lib/mysql/images/' +str(CONF.basic.image_url).split('/')[-1])
-
-    # WHUT?
+    # path when we download image on controller 
+    ControllerImagePath=('/var/lib/mysql/images/'+str(CONF.basic.image_url).split('/')[-1])
     # understanding what we need to use: wget or just path to mcv image
     if CONF.basic.image_url[0:4]=='http':
         getting_image_command="wget -q " + str(CONF.basic.image_url) + " -P /var/lib/mysql/images/"
         print (getting_image_command)
     else:
-        print ("use default path to image")
+        print ("Use default path to image: /var/lib/mysql/images/ on controller")
         getting_image_command="echo using path to image >> controller_log.log"
 
 
@@ -80,7 +77,7 @@ if __name__ == "__main__":
     instance_ip = (sshoutput[0]).rstrip('\n')
     ssh.close()
     print('I am go to sleep with instance ip')
-#    instance_ip=<if you need hardcode this>
+#    instance_ip='172.16.0.79' if you need hardcode this
     while True:
         print("Try to connect to %s" % instance_ip)
         try:
@@ -95,15 +92,13 @@ if __name__ == "__main__":
         except:
             print("could not ssh to instance, waiting for it to boot...")
             time.sleep(30)
-
     qqq, www, eee = ssh.exec_command('sudo mcvconsoler --test %s %s %s %s %s %s %s %s %s %s'
                                     % (str(CONF.basic.controller_ip), instance_ip, str(CONF.basic.os_username), str(CONF.basic.os_tenant_name),
                                        str(CONF.basic.os_password), str(CONF.basic.auth_endpoint_ip), str(CONF.basic.nailgun_host),
                                        str(CONF.basic.cluster_id), str(CONF.basic.version), str(CONF.basic.private_endpoint_ip)))
     a=www.readlines()
     print (a)
-    ssh.close()
-    
+    ssh.close()   
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
@@ -121,4 +116,4 @@ if __name__ == "__main__":
     ssh.close()
 # printing log from mcvconsoler if we have failed tests
     for stringg in mcvconsoler_log:
-        print(stringg)
+        print(stringg.strip('\n'))
