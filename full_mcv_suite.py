@@ -2,6 +2,7 @@ from __future__ import print_function
 from oslo.config import cfg
 import paramiko
 import time
+import sys
 opt_group = cfg.OptGroup(name='basic',
                          title='mcvbv.conf')
 simple_opts = [
@@ -74,18 +75,27 @@ if __name__ == "__main__":
                                     '&& nova secgroup-add-rule default tcp 22 22 0.0.0.0/0 >> controller_log.log '
                                     % (getting_image_command, ControllerImagePath)
                                     )
-
     sshoutput=www.readlines()
     print (sshoutput)
     instance_ip = (sshoutput[0]).rstrip('\n')
     ssh.close()
-#
     print('I am go to sleep with instance ip')
-    time.sleep(1200)
-    #instance_ip='172.16.0.131'
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
+#    instance_ip=<if you need hardcode this>
+    while True:
+        print("Try to connect to %s" % instance_ip)
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
+            print("connected %s" % instance_ip)
+            break
+        except paramiko.AuthenticationException:
+            print("Authentication failed when connecting to instance")
+            sys.exit(1)
+        except:
+            print("could not ssh to instance, waiting for it to boot...")
+            time.sleep(30)
+
     qqq, www, eee = ssh.exec_command('sudo mcvconsoler --test %s %s %s %s %s %s %s %s %s %s'
                                     % (str(CONF.basic.controller_ip), instance_ip, str(CONF.basic.os_username), str(CONF.basic.os_tenant_name),
                                        str(CONF.basic.os_password), str(CONF.basic.auth_endpoint_ip), str(CONF.basic.nailgun_host),
@@ -93,4 +103,22 @@ if __name__ == "__main__":
     a=www.readlines()
     print (a)
     ssh.close()
+    
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
+    qqq, www, eee = ssh.exec_command('touch /tmp/test_result.log'
+                                     '&& while [ `wc -l /tmp/test_result.log | awk -F" " {\'print $1\'}` -lt 3 ]; do sleep 10; done && cat /tmp/test_result.log')
+    a=www.readlines()
+    print (a)
+    ssh.close()
 
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
+    qqq, www, eee = ssh.exec_command('egrep -r -w "Traceback|ERROR" /var/log/mcvconsoler.log && if [ $? -eq 0 ]; then cat /var/log/mcvconsoler.log; fi')
+    mcvconsoler_log=www.readlines()
+    ssh.close()
+# printing log from mcvconsoler if we have failed tests
+    for stringg in mcvconsoler_log:
+        print(stringg)
