@@ -76,8 +76,9 @@ if __name__ == "__main__":
     print (sshoutput)
     instance_ip = (sshoutput[0]).rstrip('\n')
     ssh.close()
-    print('I am go to sleep with instance ip')
-#    instance_ip='172.16.0.79' if you need hardcode this
+
+    print('Waiting to boot instance')
+    instance_ip='172.16.0.79' # if you need hardcode this
     while True:
         print("Try to connect to %s" % instance_ip)
         try:
@@ -98,19 +99,10 @@ if __name__ == "__main__":
                                        str(CONF.basic.cluster_id), str(CONF.basic.version), str(CONF.basic.private_endpoint_ip)))
     a=www.readlines()
     print (a)
-    ssh.close()   
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
     qqq, www, eee = ssh.exec_command('touch /tmp/test_result.log'
                                      '&& while [ `wc -l /tmp/test_result.log | awk -F" " {\'print $1\'}` -lt 3 ]; do sleep 10; done && cat /tmp/test_result.log')
     a=www.readlines()
     print (a)
-    ssh.close()
-
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(instance_ip, username='mcv', password='mcv', key_filename='/tmp/id_rsa')
     qqq, www, eee = ssh.exec_command('egrep -r -w "Traceback|ERROR" /var/log/mcvconsoler.log && if [ $? -eq 0 ]; then cat /var/log/mcvconsoler.log; fi')
     mcvconsoler_log=www.readlines()
     ssh.close()
